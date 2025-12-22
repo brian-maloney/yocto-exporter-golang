@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
+          - platform: linux/386
+            arch: 386
+          - platform: linux/arm/v7
+            arch: armv7
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG_NAME: ${{ inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag,suffix=-${{ matrix.arch }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Extract binary
+        run: |
+          # Pull the image we just pushed to ensure we have it locally for creation
+          docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}-${{ matrix.arch }}"
+          docker create --name extract "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}-${{ matrix.arch }}"
+          docker cp extract:/root/yocto-exporter ./yocto-exporter-linux-${{ matrix.arch }}
+          docker rm extract
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: yocto-exporter-linux-${{ matrix.arch }}
+          path: yocto-exporter-linux-${{ matrix.arch }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      TAG_NAME: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG_NAME }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bin/
+          merge-multiple: true
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest list
+        run: |
+          BASE_IMG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          TAG="${{ env.TAG_NAME }}"
+          
+          docker manifest create "${BASE_IMG}:${TAG}" \
+            "${BASE_IMG}:${TAG}-amd64" \
+            "${BASE_IMG}:${TAG}-arm64" \
+            "${BASE_IMG}:${TAG}-386" \
+            "${BASE_IMG}:${TAG}-armv7"
+            
+          docker manifest push "${BASE_IMG}:${TAG}"
+          
+          # Also push 'latest' if this looks like a stable version
+          if [[ ! "$TAG" == *"-"* ]]; then
+            docker manifest create "${BASE_IMG}:latest" \
+              "${BASE_IMG}:${TAG}-amd64" \
+              "${BASE_IMG}:${TAG}-arm64" \
+              "${BASE_IMG}:${TAG}-386" \
+              "${BASE_IMG}:${TAG}-armv7"
+            docker manifest push "${BASE_IMG}:latest"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          files: bin/yocto-exporter-*
+          generate_release_notes: true
