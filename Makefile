@@ -15,6 +15,13 @@ ifeq ($(UNAME_S),Linux)
     ifeq ($(UNAME_M),aarch64)
         LIB_PATH_REL = linux/aarch64
     endif
+    ifneq (,$(filter $(UNAME_M),i386 i686))
+        LIB_PATH_REL = linux/i386
+    endif
+    ifneq (,$(filter $(UNAME_M),armv7l armv7))
+        LIB_PATH_REL = linux/armhf
+        EXTRA_MAKE_FLAGS = OPTS_ARMHF="-DBUILD_ARMHF -D_GNU_SOURCE"
+    endif
     LIB_YOCTO_TARGET = $(LIB_PATH_REL)/libyocto-static.a
     LIB_YAPI_TARGET = $(LIB_PATH_REL)/yapi/libyapi-static.a
 endif
@@ -38,8 +45,9 @@ yoctolib_cpp:
 	@exit 1
 
 # Build the static libraries using the provided GNUmakefile
+# We explicitly target the static libraries to avoid building dynamic ones or requiring xcodebuild
 $(LIB_YOCTO): yoctolib_cpp
-	cd yoctolib_cpp/Binaries && $(MAKE) -f GNUmakefile $(LIB_YOCTO_TARGET) $(LIB_YAPI_TARGET)
+	cd yoctolib_cpp/Binaries && $(MAKE) -f GNUmakefile $(LIB_YOCTO_TARGET) $(LIB_YAPI_TARGET) $(EXTRA_MAKE_FLAGS)
 
 # Go build command
 build: $(LIB_YOCTO)
