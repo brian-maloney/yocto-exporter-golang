@@ -1,24 +1,24 @@
 # Makefile for Yocto Exporter
 
-UNAME_S := $(shell uname -s)
-UNAME_M := $(shell uname -m)
+GOOS := $(shell go env GOOS)
+GOARCH := $(shell go env GOARCH)
 
 # Default to osx
 LIB_PATH_REL = osx
 LIB_YOCTO_TARGET = $(LIB_PATH_REL)/libyocto-static.a
 LIB_YAPI_TARGET = $(LIB_PATH_REL)/yapi/libyapi-static.a
 
-ifeq ($(UNAME_S),Linux)
-    ifeq ($(UNAME_M),x86_64)
+ifeq ($(GOOS),linux)
+    ifeq ($(GOARCH),amd64)
         LIB_PATH_REL = linux/x86_64
     endif
-    ifeq ($(UNAME_M),aarch64)
+    ifeq ($(GOARCH),arm64)
         LIB_PATH_REL = linux/aarch64
     endif
-    ifneq (,$(filter $(UNAME_M),i386 i686))
+    ifeq ($(GOARCH),386)
         LIB_PATH_REL = linux/i386
     endif
-    ifneq (,$(filter $(UNAME_M),armv7l armv7))
+    ifeq ($(GOARCH),arm)
         LIB_PATH_REL = linux/armhf
         EXTRA_MAKE_FLAGS = OPTS_ARMHF="-DBUILD_ARMHF -D_GNU_SOURCE"
     endif
