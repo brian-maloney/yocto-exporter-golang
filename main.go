@@ -29,6 +29,7 @@ var (
 func main() {
 	var (
 		listenAddress = flag.String("listen-address", ":8000", "The address to listen on for HTTP requests.")
+		metricsPath   = flag.String("metrics-path", "/metrics", "Path under which to serve metrics.")
 		hubURL        = flag.String("hub-url", "usb", "Yoctopuce Hub URL (e.g., 'usb', '127.0.0.1:4444', '192.168.1.10').")
 	)
 	flag.Parse()
@@ -49,8 +50,8 @@ func main() {
 	exporter := &YoctoExporter{}
 	prometheus.MustRegister(exporter)
 
-	http.Handle("/metrics", promhttp.Handler())
-	fmt.Printf("Starting exporter on %s monitoring hub '%s'\n", *listenAddress, *hubURL)
+	http.Handle(*metricsPath, promhttp.Handler())
+	fmt.Printf("Starting exporter on %s%s monitoring hub '%s'\n", *listenAddress, *metricsPath, *hubURL)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
