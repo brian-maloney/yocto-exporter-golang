@@ -1,0 +1,30 @@
+# Dependencies
+yoctolib_cpp/
+
+# Binaries
+yocto-exporter
+yocto-exporter-linux-arm64
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Local Cache
+.cache/
+.docker-tmp/
+
+# Go
+vendor/
+*.test
+*.out
+
+# Build Artifacts
+*.o
+*.a
+
+# IDEs and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
