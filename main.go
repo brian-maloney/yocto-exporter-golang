@@ -83,12 +83,12 @@ func (e *YoctoExporter) Collect(ch chan<- prometheus.Metric) {
 		gauge, ok := gauges[funcId]
 		if !ok {
 			gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Name: "yocto_" + funcId,
+				Name: funcId,
 				Help: "Current " + funcId + " reading",
 			}, []string{"unit", "hardwareId"})
 			gauges[funcId] = gauge
 			// Note: In a production environment, you might want to pre-register or handle registration concurrency better.
-			// But for Collect, we can just return the metric. 
+			// But for Collect, we can just return the metric.
 		}
 
 		m, err := gauge.GetMetricWithLabelValues(unit, hwId)
