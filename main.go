@@ -29,6 +29,7 @@ var (
 		Name: "sensor_value",
 		Help: "Current value of the Yoctopuce sensor function",
 	}, []string{"functionId", "unit", "hardwareId"})
+	version = "dev"
 )
 
 type stringMap map[string]string
@@ -52,10 +53,16 @@ func main() {
 		metricsPath   = flag.String("metrics-path", "/metrics", "Path under which to serve metrics.")
 		hubURL        = flag.String("hub-url", "usb", "Yoctopuce Hub URL (e.g., 'usb', '127.0.0.1:4444', '192.168.1.10').")
 		oneshot       = flag.Bool("oneshot", false, "Run once and output metrics to stdout, then exit.")
+		showVersion   = flag.Bool("version", false, "Print version information and exit.")
 		unitOverrides = make(stringMap)
 	)
 	flag.Var(&unitOverrides, "override-unit", "Override unit for a specific functionId (e.g., -override-unit temperature='C). Can be repeated.")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("yocto-exporter version %s\n", version)
+		os.Exit(0)
+	}
 
 	errmsg := C.malloc(256)
 	defer C.free(errmsg)
