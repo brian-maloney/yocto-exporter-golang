@@ -16,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"unsafe"
 
@@ -26,6 +27,8 @@ import (
 
 var (
 	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 type stringMap map[string]string
@@ -56,7 +59,11 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("yocto-exporter version %s\n", version)
+		fmt.Printf("yocto-exporter version: %s\n", version)
+		fmt.Printf("Git commit:             %s\n", commit)
+		fmt.Printf("Go version:             %s\n", runtime.Version())
+		fmt.Printf("Built:                  %s\n", date)
+		fmt.Printf("OS/Arch:                %s/%s\n", runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	}
 
