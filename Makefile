@@ -42,7 +42,7 @@ LIB_YOCTO = $(LIB_DIR)/libyocto-static.a
 LIB_YAPI = $(YAPI_LIB_DIR)/libyapi-static.a
 
 # Cache directories for Go (to avoid Seatbelt issues)
-GO_CACHE_DIR = $(PWD)/.cache
+GO_CACHE_DIR = $(PWD)/.cache_new
 GOMODCACHE = $(GO_CACHE_DIR)/go-mod
 GOCACHE = $(GO_CACHE_DIR)/go-build
 

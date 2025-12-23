@@ -25,10 +25,6 @@ import (
 )
 
 var (
-	sensorGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "sensor_value",
-		Help: "Current value of the Yoctopuce sensor function",
-	}, []string{"functionId", "unit", "hardwareId"})
 	version = "dev"
 )
 
@@ -74,11 +70,13 @@ func main() {
 		fmt.Printf("Init error: %s\n", C.GoString((*C.char)(errmsg)))
 		os.Exit(1)
 	}
+	C.yocto_AllSensorsInit()
 	defer C.yocto_FreeAPI()
 
 	// Create a custom collector to update gauges on every scrape
 	exporter := &YoctoExporter{
 		unitOverrides: unitOverrides,
+		gauges:        make(map[string]*prometheus.GaugeVec),
 	}
 
 	if *oneshot {
@@ -108,6 +106,7 @@ func main() {
 
 type YoctoExporter struct {
 	unitOverrides map[string]string
+	gauges        map[string]*prometheus.GaugeVec
 }
 
 func (e *YoctoExporter) Describe(ch chan<- *prometheus.Desc) {
@@ -136,7 +135,16 @@ func (e *YoctoExporter) Collect(ch chan<- prometheus.Metric) {
 
 		val := float64(C.yocto_GetCurrentValue(s))
 
-		m, err := sensorGauge.GetMetricWithLabelValues(funcId, unit, hwId)
+		gauge, ok := e.gauges[funcId]
+		if !ok {
+			gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Name: funcId,
+				Help: "Current " + funcId + " reading",
+			}, []string{"unit", "hardwareId"})
+			e.gauges[funcId] = gauge
+		}
+
+		m, err := gauge.GetMetricWithLabelValues(unit, hwId)
 		if err == nil {
 			m.Set(val)
 			m.Collect(ch)

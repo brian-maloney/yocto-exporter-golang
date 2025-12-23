@@ -1,5 +1,17 @@
 #include "yocto_wrapper.h"
 #include "yocto_api.h"
+#include "yocto_humidity.h"
+#include "yocto_temperature.h"
+#include "yocto_pressure.h"
+#include "yocto_lightsensor.h"
+#include "yocto_accelerometer.h"
+#include "yocto_altitude.h"
+#include "yocto_arithmeticsensor.h"
+#include "yocto_current.h"
+#include "yocto_voltage.h"
+#include "yocto_power.h"
+#include "yocto_colorled.h"
+#include "yocto_display.h"
 #include <string.h>
 
 extern "C" {
@@ -17,6 +29,21 @@ int yocto_RegisterHub(const char* url, char* errMsg, int errMsgSize) {
 void yocto_FreeAPI() {
     YAPI::FreeAPI();
 }
+
+void yocto_AllSensorsInit() {
+    // Force linking of all sensor classes by referencing their FirstX functions
+    YHumidity::FirstHumidity();
+    YTemperature::FirstTemperature();
+    YPressure::FirstPressure();
+    YLightSensor::FirstLightSensor();
+    YAccelerometer::FirstAccelerometer();
+    YAltitude::FirstAltitude();
+    YArithmeticSensor::FirstArithmeticSensor();
+    YCurrent::FirstCurrent();
+    YVoltage::FirstVoltage();
+    YPower::FirstPower();
+}
+
 
 int yocto_UpdateCheck(char* errMsg, int errMsgSize) {
     string err;
