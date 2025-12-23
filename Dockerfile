@@ -1,5 +1,5 @@
 # Use a Go builder image
-FROM golang:1.23 AS builder
+FROM golang:1.25-bookworm AS builder
 
 ARG YOCTOLIB_VERSION=v2.1.6320
 
