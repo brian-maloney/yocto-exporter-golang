@@ -16,22 +16,45 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"unsafe"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 )
 
 var (
-	gauges = make(map[string]*prometheus.GaugeVec)
+	sensorGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "sensor_value",
+		Help: "Current value of the Yoctopuce sensor function",
+	}, []string{"functionId", "unit", "hardwareId"})
 )
+
+type stringMap map[string]string
+
+func (m stringMap) String() string {
+	return fmt.Sprintf("%v", map[string]string(m))
+}
+
+func (m stringMap) Set(value string) error {
+	parts := strings.SplitN(value, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid format, expected key=value")
+	}
+	m[parts[0]] = parts[1]
+	return nil
+}
 
 func main() {
 	var (
 		listenAddress = flag.String("listen-address", ":8000", "The address to listen on for HTTP requests.")
 		metricsPath   = flag.String("metrics-path", "/metrics", "Path under which to serve metrics.")
 		hubURL        = flag.String("hub-url", "usb", "Yoctopuce Hub URL (e.g., 'usb', '127.0.0.1:4444', '192.168.1.10').")
+		oneshot       = flag.Bool("oneshot", false, "Run once and output metrics to stdout, then exit.")
+		unitOverrides = make(stringMap)
 	)
+	flag.Var(&unitOverrides, "override-unit", "Override unit for a specific functionId (e.g., -override-unit temperature='C). Can be repeated.")
 	flag.Parse()
 
 	errmsg := C.malloc(256)
@@ -47,7 +70,28 @@ func main() {
 	defer C.yocto_FreeAPI()
 
 	// Create a custom collector to update gauges on every scrape
-	exporter := &YoctoExporter{}
+	exporter := &YoctoExporter{
+		unitOverrides: unitOverrides,
+	}
+
+	if *oneshot {
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(exporter)
+
+		mfs, err := reg.Gather()
+		if err != nil {
+			log.Fatalf("Error gathering metrics: %v", err)
+		}
+
+		enc := expfmt.NewEncoder(os.Stdout, expfmt.FmtText)
+		for _, mf := range mfs {
+			if err := enc.Encode(mf); err != nil {
+				log.Fatalf("Error encoding metric: %v", err)
+			}
+		}
+		return
+	}
+
 	prometheus.MustRegister(exporter)
 
 	http.Handle(*metricsPath, promhttp.Handler())
@@ -55,7 +99,9 @@ func main() {
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
-type YoctoExporter struct{}
+type YoctoExporter struct {
+	unitOverrides map[string]string
+}
 
 func (e *YoctoExporter) Describe(ch chan<- *prometheus.Desc) {
 	// Dynamically described during Collect
@@ -73,25 +119,17 @@ func (e *YoctoExporter) Collect(ch chan<- prometheus.Metric) {
 		funcId := C.GoString(&buf[0])
 
 		C.yocto_GetUnit(s, &buf[0], 256)
-		unit := C.GoString(&buf[0])
+		unit := strings.ToValidUTF8(C.GoString(&buf[0]), "?")
+		if override, ok := e.unitOverrides[funcId]; ok {
+			unit = override
+		}
 
 		C.yocto_GetHardwareId(s, &buf[0], 256)
 		hwId := C.GoString(&buf[0])
 
 		val := float64(C.yocto_GetCurrentValue(s))
 
-		gauge, ok := gauges[funcId]
-		if !ok {
-			gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Name: funcId,
-				Help: "Current " + funcId + " reading",
-			}, []string{"unit", "hardwareId"})
-			gauges[funcId] = gauge
-			// Note: In a production environment, you might want to pre-register or handle registration concurrency better.
-			// But for Collect, we can just return the metric.
-		}
-
-		m, err := gauge.GetMetricWithLabelValues(unit, hwId)
+		m, err := sensorGauge.GetMetricWithLabelValues(funcId, unit, hwId)
 		if err == nil {
 			m.Set(val)
 			m.Collect(ch)
