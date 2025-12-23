@@ -70,7 +70,6 @@ func main() {
 		fmt.Printf("Init error: %s\n", C.GoString((*C.char)(errmsg)))
 		os.Exit(1)
 	}
-	C.yocto_AllSensorsInit()
 	defer C.yocto_FreeAPI()
 
 	// Create a custom collector to update gauges on every scrape

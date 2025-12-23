@@ -9,7 +9,6 @@ typedef void* YSensorPtr;
 
 int yocto_RegisterHub(const char* url, char* errMsg, int errMsgSize);
 void yocto_FreeAPI();
-void yocto_AllSensorsInit();
 int yocto_UpdateCheck(char* errMsg, int errMsgSize);
 
 YSensorPtr yocto_FirstSensor();
