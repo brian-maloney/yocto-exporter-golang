@@ -22,8 +22,11 @@ COPY . .
 ENV GOMODCACHE=/app/.cache/go-mod
 ENV GOCACHE=/app/.cache/go-build
 
+# Build argument for version injection
+ARG VERSION=dev
+
 # Build the binary
-RUN make && strip yocto-exporter
+RUN make VERSION=${VERSION} && strip yocto-exporter
 
 # Final stage: minimal runtime image
 FROM debian:bookworm-slim

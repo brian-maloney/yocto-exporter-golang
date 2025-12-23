@@ -3,6 +3,15 @@
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
 
+# Try to detect the number of CPUs to run make jobs in parallel
+NPROCS = 1
+ifeq ($(GOOS),darwin)
+    NPROCS = $(shell sysctl -n hw.ncpu)
+else ifeq ($(GOOS),linux)
+    NPROCS = $(shell nproc)
+endif
+MAKEFLAGS += -j$(NPROCS)
+
 # Default to osx
 LIB_PATH_REL = osx
 LIB_YOCTO_TARGET = $(LIB_PATH_REL)/libyocto-static.a
@@ -37,6 +46,11 @@ GO_CACHE_DIR = $(PWD)/.cache
 GOMODCACHE = $(GO_CACHE_DIR)/go-mod
 GOCACHE = $(GO_CACHE_DIR)/go-build
 
+# Calculate version
+# Allow VERSION to be set from environment/command line, otherwise try git
+VERSION ?= $(shell git describe --tags --always --long 2>/dev/null || echo "dev")
+LDFLAGS := -X main.version=$(VERSION)
+
 all: build
 
 # Ensure submodules or dependencies are present
@@ -57,7 +71,10 @@ build: $(LIB_YOCTO)
 	CGO_CFLAGS="-I$(PWD)/yoctolib_cpp/Sources" \
 	CGO_CXXFLAGS="-I$(PWD)/yoctolib_cpp/Sources" \
 	CGO_LDFLAGS="-L$(PWD)/$(LIB_DIR) -L$(PWD)/$(YAPI_LIB_DIR) -lyocto-static -lyapi-static" \
-	go build -o yocto-exporter
+	go build -ldflags "$(LDFLAGS)" -o yocto-exporter
+
+version:
+	@echo $(VERSION)
 
 clean:
 	cd yoctolib_cpp/Binaries && $(MAKE) -f GNUmakefile clean
